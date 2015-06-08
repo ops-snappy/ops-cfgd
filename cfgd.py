@@ -36,17 +36,12 @@ idl = None
 def_db = 'unix:/var/run/openvswitch/db.sock'
 
 # Configuration file definitions
-CONFIG_FILE_DIR = '/var/local/config/'
-USER_FILE = CONFIG_FILE_DIR + 'user.cfg'
-STARTUP_FILE = CONFIG_FILE_DIR + 'startup.cfg'
-FACTORY_FILE = CONFIG_FILE_DIR + '.factory.cfg'
-CONFIG_FILE_SEARCH_LIST = [USER_FILE, STARTUP_FILE, FACTORY_FILE]
-
-'''
-# HALON_TODO: Remove if we decide to not use linux files.
-cfg_filep = None
-cfg_name = None
-'''
+saved_config = None
+# HALON_TODO: Need to pull these three from the build env
+cfgdb_schema = '/usr/share/openvswitch/configdb.ovsschema'
+ovs_schema = '/usr/share/openvswitch/vswitch.ovsschema'
+type_startup_config = "startup"
+max_miliseconds_to_wait_for_config_data = 30  #3 sec max retry
 
 # Program control
 exiting = False
@@ -65,6 +60,21 @@ def unixctl_exit(conn, unused_argv, unused_aux):
 
     exiting = True
     conn.reply(None)
+
+#------------------ db_is_cur_cfg_set() ----------------
+def db_is_cur_cfg_set(data):
+    '''
+    Check to see if the Open_vSwitch:cur_cfg value exists and is > 0
+    '''
+
+    for ovs_rec in data["Open_vSwitch"].rows.itervalues():
+        if ovs_rec.cur_cfg:
+            if ovs_rec.cur_cfg > 0:
+                return True
+            else:
+                return False
+
+    return False
 
 #------------------ db_get_hw_done() ----------------
 def db_get_hw_done(data):
@@ -91,6 +101,11 @@ def wait_for_hw_done():
 
     global idl
 
+    # Check db to see if cfgd has already run.
+    if db_is_cur_cfg_set(idl.tables):
+        vlog.info("cur_cfg already set...cfgd exiting")
+        return terminate()
+
     # Check db to see if h/w initialization has completed.
 
     if db_get_hw_done(idl.tables):
@@ -100,62 +115,77 @@ def wait_for_hw_done():
         sleep(0.2)
         return False
 
+#------------------ get_config() ----------------
+def get_config(idl_cfg):
+    '''
+    Walk through the rows in the config table (if any)
+    looking for a row with type == startup.
 
+    If found, set global variable saved_config to the content
+    of the "config" field in that row.
+    '''
+
+    global saved_config
+
+    #Note: If the configdb does not exist, the only way to know it
+    #      is that the "config" table does not exist.
+    tbl_found = False
+    for ovs_rec in idl_cfg.tables["config"].rows.itervalues():
+        tbl_found = True
+        if ovs_rec.type:
+            if ovs_rec.type == type_startup_config:
+                saved_config = ovs_rec.config
+                return
+
+    if not tbl_found:
+        vlog.info("config table not found")
+
+#------------------ check_for_startup_config() ----------------
+def check_for_startup_config(remote):
+    '''
+    Connect to the db server and specify the configdb database.
+    Look for an entry with type=startup
+    If exists, read the configuration.
+    '''
+
+    global saved_config
+
+    saved_config = None
+
+    schema_helper_cfg = ovs.db.idl.SchemaHelper(location=cfgdb_schema)
+    schema_helper_cfg.register_table("config")
+
+    idl_cfg = ovs.db.idl.Idl(remote, schema_helper_cfg)
+
+    # Take a pass at the db to get any config data
+    # Note: idl.run() function returns true when seqno changes
+    cnt = max_miliseconds_to_wait_for_config_data
+    while not idl_cfg.run() and cnt > 0:
+        cnt -= 1
+        sleep(.1)
+
+    get_config(idl_cfg)
+
+    idl_cfg.close()
+
+    return
 
 #####################  Utility Methods ######################
-
-#------------------ check_for_default_config() ----------------
-def check_for_default_config():
-
-    '''
-    # HALON_TODO: Remove if we decide to not use linux files.
-    for name in CONFIG_FILE_SEARCH_LIST:
-        if os.path.isfile(name):
-            try:
-                f = open(name, 'r')
-            except Exception as e:
-                vlog.err('config file open failed for {0}, e={1}' \
-                            .format(name, e))
-                return None, None
-            return f, name
-
-    return None, None
-    '''
-
-    pass
 
 #------------------ push_config_to_db() ----------------
 def push_config_to_db():
     '''
-    Take the previously discovered default configuration and
+    Take the previously discovered startup configuration and
     push it to the database.
     '''
 
-    '''
-    # HALON_TODO: Remove if we decide to not use linux files.
-    # This is older code that pulls the config from a file.
-    global cfg_filep, cfg_name
+    global saved_config
 
-
-    if cfg_filep is None:
-        vlog.info('No configuration to push')
-        return True
-
-    try:
-        config = json.load(cfg_filep)
-    except Exception as e:
-        vlog.err('config file read failed for {0}, e={1}'.format(cfg_name, e))
-        raise e
-
-    try:
-        # HALON_TODO: Call goes here to push config to db
-        pass
-    except Exception as e:
-        vlog.err('config push to db failed, e={0}'.format(e))
-        raise e
-    '''
-
-    vlog.info('No configuration to push')
+    if saved_config == None:
+        vlog.info('No saved configuration exists')
+    else:
+        #HALON_TODO: Change this log msg to the actual push code when available
+        vlog.info('Config data found')
 
     return True
 
@@ -239,27 +269,15 @@ def main():
 
     cfgd processing logic is:
 
-    # HALON_TODO: Remove if we decide to not use linux files.
-    ### this is the old way....###
-    locate configuration file to use. Search in the following order...
-        1st - User default config : /var/local/config/user.cfg
-        2nd - User startup config : /var/local/config/startup.cfg
-        3rd - Factory default config: /var/local/config/.factory.cfg
-
-    # HALON_TODO: Keep if we decide to use a cfg db.
-    ### the new way is....###
-    connect to the cfg db
-    locate the row marked as default (if exists)
+    create IDL session to configdb
+    if row with type=startup exists, save off the config data
+    close configdb IDL session
 
     start main loop and call functions to...
         wait for h/w initialization to complete
-        if default config found, push the config to the db.
+        if default config (see above), push the config to the db.
         mark configuration completion in the db.
         terminate
-
-    In the future, cfgd will not terminate. It will continue to
-    watch for configuration changes and then mark configuration done
-    when all config daemons indicate they are done.
     '''
 
     global exiting
@@ -282,11 +300,10 @@ def main():
     else:
         remote = args.database
 
-    schema_helper = ovs.db.idl.SchemaHelper()
+    # Locate default config if it exists
+    check_for_startup_config(remote)
 
-    # This is here as reference....need to remove at some point.
-    #schema_helper.register_columns("Interface", ["name", "type", "options"])
-
+    schema_helper = ovs.db.idl.SchemaHelper(location=ovs_schema)
     schema_helper.register_columns("Open_vSwitch", \
             ["cur_hw", "cur_cfg", "next_cfg"])
 
@@ -300,9 +317,6 @@ def main():
         ovs.util.ovs_fatal(error, "could not create unixctl server", vlog)
 
     seqno = idl.change_seqno    # Sequence number when we last processed the db
-
-    # Locate default config if it exists
-    check_for_default_config()
 
     init_dispatcher()
 
