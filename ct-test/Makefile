@@ -1,5 +1,4 @@
-#!/bin/sh
-# Copyright (C) 2014-2015 Hewlett-Packard Development Company, L.P.
+# Copyright (C) 2015 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,6 +12,9 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+#
+# cfgd/test/Makefile
 
-# Start the DAL, sysd
-/usr/local/halon/sbin/halonctl start dal sysd
+all:
+	echo "Running component tests for cfgd"
+	sudo ./cfgd_test.py

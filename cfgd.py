@@ -127,18 +127,22 @@ def get_config(idl_cfg):
 
     global saved_config
 
-    #Note: If the configdb does not exist, the only way to know it
-    #      is that the "config" table does not exist.
+    #Note: You can't tell the difference between the config table not
+    #      existing (that is the configdb is not there) or just that there
+    #      are no rows in the config table.
     tbl_found = False
     for ovs_rec in idl_cfg.tables["config"].rows.itervalues():
         tbl_found = True
         if ovs_rec.type:
             if ovs_rec.type == type_startup_config:
-                saved_config = ovs_rec.config
+                if ovs_rec.config:
+                    saved_config = ovs_rec.config
+                else:
+                    vlog.warn("startup config row does not have config column")
                 return
 
     if not tbl_found:
-        vlog.info("config table not found")
+        vlog.info("No rows found in the config table")
 
 #------------------ check_for_startup_config() ----------------
 def check_for_startup_config(remote):

@@ -1,0 +1,1 @@
+ovsdb-client -v transact '["configdb", {"op":"insert", "table": "config", "row": { "type": "testtype", "name": "test-config", "config": "{'config-type':'test'}" } } ]'
