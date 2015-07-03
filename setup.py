@@ -18,8 +18,8 @@ from setuptools import setup
 setup(
     name='cfgd',
     version='1.0',
-    py_modules=['cfgd'],
+    py_modules=['cfgd','cfgdbutil','cfgdb'],
     entry_points={
-        'console_scripts': ['cfgd = cfgd:main',]
+        'console_scripts': ['cfgd = cfgd:main','cfgdbutil = cfgdbutil:main']
     }
 )
