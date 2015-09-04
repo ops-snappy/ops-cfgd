@@ -30,6 +30,11 @@ import ovs.unixctl
 import ovs.unixctl.server
 import ovs.vlog
 
+from runconfig.runconfig import RunConfigUtil
+from halonrest.settings import settings
+from halonrest.manager import OvsdbConnectionManager
+from halonlib import restparser
+
 # ovs definitions
 idl = None
 # HALON_TODO: Need to pull this from the build env
@@ -190,6 +195,28 @@ def push_config_to_db():
     else:
         #HALON_TODO: Change this log msg to the actual push code when available
         vlog.info('Config data found')
+        try :
+            data = json.loads(saved_config)
+        except ValueError, e:
+            print("Invalid json from configdb. Exception: %s\n" % e)
+            return
+
+        # set up IDL
+        manager = OvsdbConnectionManager(settings.get('ovs_remote'), settings.get('ovs_schema'))
+        manager.start()
+        manager.idl.run()
+
+        init_seq_no = manager.idl.change_seqno
+        while True:
+            manager.idl.run()
+            if init_seq_no != manager.idl.change_seqno:
+                break
+            sleep(1)
+
+        # read the schema
+        schema = restparser.parseSchema(settings.get('ext_schema'))
+        run_config_util = RunConfigUtil(manager.idl, schema)
+        run_config_util.write_config_to_db(data)
 
     return True
 

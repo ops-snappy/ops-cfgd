@@ -13,10 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from runconfig.runconfig import RunConfigUtil
+from halonrest.settings import settings
+from halonrest.manager import OvsdbConnectionManager
+from halonlib import restparser
+
 import getopt
 import os
 import json
 import sys
+import time
 
 import ovs.dirs
 from ovs.db import error
@@ -44,13 +50,86 @@ def show_config(args):
             parsed = json.loads(row.config)
             print("Startup configuration:")
             print json.dumps(parsed,  indent=4, sort_keys=True)
-            print("End")
         except ValueError, e:
             print("Invalid json from configdb. Exception: %s\n" % e)
     else:
-        print("No saved configuration of type startup")
+        print('No saved configuration exists')
 
     cfg.close()
+
+def copy_running_startup():
+    cfg = cfgdb.Cfgdb()
+    manager = OvsdbConnectionManager(settings.get('ovs_remote'), settings.get('ovs_schema'))
+    manager.start()
+    idl = manager.idl
+
+    init_seq_no = idl.change_seqno
+    # Wait until the connection is ready
+    while True:
+        idl.run()
+        # print self.idl.change_seqno
+        if init_seq_no != idl.change_seqno:
+            break
+        time.sleep(1)
+
+    restschema = restparser.parseSchema(settings.get('ext_schema'))
+
+    run_config_util = RunConfigUtil(idl, restschema)
+    config = run_config_util.get_running_config()
+
+    cfg.config = ovs.json.to_string(config)
+    cfg.type = "startup"
+    row, tbl_found = cfg.find_row_by_type("startup")
+    if tbl_found:
+        cfg.update_row(row)
+    else:
+        cfg.insert_row()
+
+    cfg.close()
+
+def copy_startup_running():
+    cfg = cfgdb.Cfgdb()
+
+    #HALON TODO: To get confg type from user as args
+    row, tbl_found = cfg.find_row_by_type("startup")
+
+    if tbl_found:
+        try :
+            data = json.loads(row.config)
+        except ValueError, e:
+            print("Invalid json from configdb. Exception: %s\n" % e)
+            cfg.close()
+            return
+    else:
+        print('No saved configuration exists')
+        cfg.close()
+        return
+
+    # set up IDL
+    manager = OvsdbConnectionManager(settings.get('ovs_remote'), settings.get('ovs_schema'))
+    manager.start()
+    manager.idl.run()
+
+    init_seq_no = manager.idl.change_seqno
+    while True:
+        manager.idl.run()
+        if init_seq_no != manager.idl.change_seqno:
+            break
+        time.sleep(1)
+
+    # read the schema
+    schema = restparser.parseSchema(settings.get('ext_schema'))
+    run_config_util = RunConfigUtil(manager.idl, schema)
+    run_config_util.write_config_to_db(data)
+    cfg.close()
+
+def copy_config(args):
+    if (args[0] == "running-config" and args[1] == "startup-config"):
+        copy_running_startup()
+    elif (args[0] == "startup-config" and args[1] =="running-config"):
+        copy_startup_running()
+    else :
+        print("Unknow config (use --help for help)")
 
 def delete_config(args):
     if (args[0] != "startup-config"):
@@ -65,7 +144,7 @@ def delete_config(args):
     if tbl_found:
         print("Delete statup row status : %s" % status)
     else :
-        print("No saved configuration of type startup")
+        print('No saved configuration exists')
 
     cfg.close()
 
@@ -76,6 +155,10 @@ def usage(name):
         The following commands are supported: \n\n\
         show startup-config \n\
             Shows the contentes of startup configuration \n\n\
+        copy running-config startup-config \n\
+            Copy running config to startup config \n\n\
+        copy start-config running-config \n\
+            Copy startup config to running config)\n\n\
         delete startup-config \n\
             Delete the startup configuration row in configdb\n\n" % (name,name))
 
@@ -101,6 +184,7 @@ def main():
     #Command Dictionary with command name as key and key value as list
     #with functions and corresponding argument length
     commands = { "show" : (show_config, 1),
+                 "copy": (copy_config, 2),
                  "delete" : (delete_config, 1) }
 
     command_name = args[0]
