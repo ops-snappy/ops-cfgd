@@ -48,8 +48,8 @@ CUR_CFG_SET_MSG = "cur_cfg already set"
 OVSDB = "/var/run/openvswitch/ovsdb.db"
 CONFIGDB = "/var/local/openvswitch/config.db"
 OVSDB_CLIENT_TRANSACT_CMD = "/usr/bin/ovsdb-client -v transact "
-ADD_STARTUP_ROW_FILE = "add_startup_row"
-ADD_TEST_ROW_FILE = "add_test_row"
+ADD_STARTUP_ROW_FILE = "./src/ops-cfgd/tests/add_startup_row"
+ADD_TEST_ROW_FILE = "./src/ops-cfgd/tests/add_test_row"
 GET_OPEN_VSWITCH_TABLE_CMD = "ovs-vsctl list open_vswitch"
 
 '''
@@ -104,7 +104,6 @@ class cfgdTest( HalonTest ):
         for x in mylines:
             pair = x.split(':')
             if "cur_cfg" in pair[0]:
-                print pair[1]
                 if int(pair[1]) > 0:
                     found_cur = True
             elif "next_cfg" in pair[0]:
@@ -134,29 +133,25 @@ class cfgdTest( HalonTest ):
         self.start_daemon(switch, PLATFORM_DAEMONS)
         time.sleep(0.1)
 
-    def test_001_connect_to_db(self, switch):
-        info("test_001_connect_to_db.\n")
-        info("Verify correctly detects no configdb\n")
+    def verify_no_configdb_detection(self):
+        info("\n########## Test to verify correctly cfgd  detects no configdb ##########")
 
+        switch = self.net.switches [ 0 ]
         self.restart_system(switch, "noconfig")
 
         # start cfgd
         out = switch.cmd(CFGD_CMD)
         debug(out)
         if CFG_TBL_NOT_FOUND_MSG in out:
-            info("Correct msg received when no configdb.\n")
+            info("\n### Passed: Correct msg received when no configdb ###")
         else:
-            error("Incorrect response when configdb missing.\n")
-            info(out+'\n')
-            return False
+            assert ( CFG_TBL_NOT_FOUND_MSG in out ), \
+                    "Failed: Incorrect response when configdb missing.\n"
 
-        return True
+    def verify_connect_to_db(self):
+        info("\n########## Test to verify connects to configdb ###########")
 
-    def test_002_connect_to_db(self, switch):
-        info("test_002_connect_to_db.\n")
-
-        info("Verify connects to configdb\n")
-
+        switch = self.net.switches [ 0 ]
         self.restart_system(switch, "normal")
 
         # start cfgd
@@ -164,19 +159,14 @@ class cfgdTest( HalonTest ):
         debug(out)
 
         if CFG_TBL_NOT_FOUND_MSG in out:
-            info("Correct msg received when no rows in config table.\n")
+            info("\n### Passed: Correct msg received when no rows in config table ####")
         else:
-            error("Incorrect response when no rows in config table.\n")
-            info(out+'\n')
-            return False
+            assert ( CFG_TBL_NOT_FOUND_MSG in out ), \
+                    "Failed: Incorrect response when no rows in config table.\n"
 
-        return True
-
-    def test_003_find_startup(self, switch):
-        info("test_003_find_startup\n")
-
-        info("Verify finds type == startup row\n")
-
+    def verify_find_startup_row(self):
+        info("\n########## Test to verify cfgd finds startup row in configdb ##########")
+        switch = self.net.switches [ 0 ]
         self.restart_system(switch, "normal")
 
         # Add two rows to configdb, one type==startup, one type==testtype
@@ -202,19 +192,15 @@ class cfgdTest( HalonTest ):
         debug(out)
 
         if CFG_DATA_FOUND_MSG in out:
-            info("Correct msg received when startup config in config table.\n")
+            info("\n### Passed: Correct msg received when startup config in config table. ###")
         else:
-            error("Incorrect response when startup config in config table.\n")
-            info(out+'\n')
-            return False
+            assert ( CFG_DATA_FOUND_MSG in out ), \
+                    "Failed: Incorrect response when startup config in config table.\n"
 
-        return True
+    def verify_mark_completion(self):
+        info("\n########## Test to verify cur_cfg and next_cfg set > 0 #########")
 
-    def test_004_mark_completion(self, switch):
-        info("test_004_mark_completion\n")
-
-        info("Verify cur_cfg and next_cfg set > 0\n")
-
+        switch = self.net.switches [ 0 ]
         # Init everything, but don't really need a config
         self.restart_system(switch, "normal")
 
@@ -226,28 +212,77 @@ class cfgdTest( HalonTest ):
 
         # Get the contents of the Open_vSwitch table
         if not self.chk_cur_next_cfg(switch):
-            info("cur/next cfg not properly set")
-            return False
+            assert(self.chk_cur_next_cfg(switch)), \
+                  "Failed:cur/next cfg not properly set"
         else:
-            info("cur_cfg, next_cfg properly set")
+            info("\n### Passed: cur_cfg, next_cfg properly set ###")
 
-        return True
+    def copy_start_running_on_bootup(self):
+        info("\n########## Test to copying startup to running config on bootup #########")
+        switch = self.net.switches [ 0 ]
 
-    def test(self):
-        s1 = self.net.switches[0]
-        #h1 = self.net.hosts[0]
+        # Change hostname as CT-TEST in running db and copy the running
+        # configuration to startup config. Now restart the system and
+        # verify that the hostname is configured correctly during bootup
 
-        # Call the tests.
-        ret_status = True
+        switch.cmdCLI("configure terminal")
+        switch.cmdCLI("hostname CT-TEST")
+        switch.cmdCLI("exit")
+        switch.cmdCLI("copy running-config startup-config")
 
-        ret_status &= self.test_001_connect_to_db(s1)
-        ret_status &= self.test_002_connect_to_db(s1)
-        ret_status &= self.test_003_find_startup(s1)
-        ret_status &= self.test_004_mark_completion(s1)
+        self.restart_system(switch, "normal")
 
-        # True iff all tests returned True
-        return ret_status
+        # Run cfgd
+        out = switch.cmd(CFGD_CMD)
+        sleep(5)
+        out += switch.cmd("echo")
+        debug(out)
 
-if __name__ == '__main__':
-    test = cfgdTest()
-    test.run(runCLI=False)
+        output = switch.cmdCLI("show running-config")
+        output += switch.cmdCLI("end")
+
+        if "hostname \"CT-TEST\"" in output:
+            info('\n### Passed: copy running to startup configuration on bootup ###\n')
+        else:
+            assert ("hostname CT-TEST" in output), \
+                    "Failed: copy running to startup configuration on bootup"
+
+class Test_cfgdTest:
+    def setup(self):
+        pass
+
+    def teardown(self):
+        pass
+
+    def setup_class(cls):
+        Test_cfgdTest.test = cfgdTest()
+        pass
+
+    def teardown_class(cls):
+    # Stop the Docker containers, and
+    # mininet topology
+        Test_cfgdTest.test.net.stop()
+
+    def setup_method(self, method):
+        pass
+
+    def teardown_method(self, method):
+        pass
+
+    def __del__(self):
+        del self.test
+
+    def test_verify_no_configdb_detection(self):
+        self.test.verify_no_configdb_detection()
+
+    def test_verify_connect_to_db(self):
+        self.test.verify_connect_to_db()
+
+    def test_verify_find_startup_row(self):
+        self.test.verify_find_startup_row()
+
+    def test_verify_mark_completion(self):
+        self.test.verify_mark_completion()
+
+    def test_copy_start_running_on_bootup(self):
+        self.test.copy_start_running_on_bootup()

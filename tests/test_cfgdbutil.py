@@ -26,7 +26,7 @@ import json
 from halonvsi.docker import *
 from halonvsi.halon import *
 
-ADD_STARTUP_ROW_FILE = "add_startup_row"
+ADD_STARTUP_ROW_FILE = "./src/ops-cfgd/tests/add_startup_row"
 JSON_CONFIG_STRING = "{\"config-type\":\"test\"}"
 
 class cfgdbUtilTests( HalonTest ):
@@ -56,14 +56,12 @@ class cfgdbUtilTests( HalonTest ):
     output = s1.cmd(startup_row)
 
   def cfgdbutils_delete_command(self):
-    print('\n=========================================')
-    print('*** Test to cfgdbutils delete commands ***')
-    print('=========================================')
+    info('\n########## Test cfgdbutils delete commands ##########')
     #configuring Halon, in the future it would be through
     #proper Halon commands
     s1 = self.net.switches[ 0 ]
 
-    print('Delete startup config saved in configdb')
+    info('\n### Delete startup config saved in configdb ###')
 
     # Note: I have to use the extra "echo" command to flush out
     #       the buffer
@@ -72,19 +70,13 @@ class cfgdbUtilTests( HalonTest ):
     debug(output)
 
     if 'success' in output:
-      print(output)
+      info('\n### Passed: Delete startup configuration ###')
     else:
-      print(output)
-      assert 0, output
-
-    print('=============================================')
-    print('*** End of delete commands ***')
-    print('=============================================')
+      assert ('success' in out), \
+            "Failed: Delete startup configuration"
 
   def cfgdbutils_show_command(self):
-    print('\n=========================================')
-    print('*** Test to cfgdbutils show commands ***')
-    print('=========================================')
+    info('\n########## Test cfgdbutils show commands ##########')
 
     self.insert_startup_config()
     #configuring Halon, in the future it would be through
@@ -98,7 +90,7 @@ class cfgdbUtilTests( HalonTest ):
     debug(output)
 
     output = output[output.index('{'):]
-    output = output[:output.index('}') + 1 ]
+    output = output[:output.rindex('}') + 1 ]
 
     parsed =json.loads(output)
     output = json.dumps(parsed, indent=4, sort_keys=True)
@@ -107,22 +99,66 @@ class cfgdbUtilTests( HalonTest ):
     config_string = json.dumps(parsed, indent=4, sort_keys=True)
 
     if config_string in output:
-      print("Fetch startup configuration success")
+      info('\n### Passed: Fetch startup configuration success ###')
     else:
-      print(config_string)
-      print(output)
-      assert 0, output
+      assert (config_string in out), \
+           "Failed: To fetch startup configuration"
 
-    print('=============================================')
-    print('*** End of show commands ***')
-    print('=============================================')
+  def cfgdbutils_copy_running_startup(self):
+    info('\n########## Test copy running to startup config ##########')
 
+    s1 = self.net.switches[ 0 ]
+
+    # Change hostname as CT-TEST in running db and copy the running
+    # configuration to startup config and verify the JSON  dump
+    # of config contain hostname as CT-TEST("hostname": "CT-TEST").
+
+    s1.cmdCLI("configure terminal")
+    s1.cmdCLI("hostname CT-TEST")
+    s1.cmdCLI("exit")
+    s1.cmdCLI("copy running-config startup-config")
+
+    output = s1.cmdCLI("show startup-config")
+    output += s1.cmdCLI("end")
+
+    output = output[output.index('{'):]
+    output = output[:output.rindex('}') + 1 ]
+
+    parsed =json.loads(output)
+    openvswitch = parsed["Open_vSwitch"]
+    for key, value in openvswitch.iteritems():
+      hostname = value['hostname']
+      break
+
+    if "CT-TEST" in hostname:
+      info('\n### Passed: copy running to startup configuration ###')
+    else:
+      assert ("CT-TEST" in hostname), \
+           "Failed: copy running to startup configuration"
+
+  def cfgdbutils_copy_startup_running(self):
+    info('\n########## Test copy startup to running config ##########')
+
+    s1 = self.net.switches[ 0 ]
+
+    # Change hostname as openswitch in running db and copy the startup
+    # configuration to running config and verify in show running config
+    # that hostname is again changed to CT-TEST.
+    s1.cmdCLI("configure terminal")
+    s1.cmdCLI("hostname openswitch")
+    s1.cmdCLI("exit")
+    s1.cmdCLI("copy startup-config  running-config")
+
+    output = s1.cmdCLI("show running-config")
+    output += s1.cmdCLI("end")
+
+    if "hostname \"CT-TEST\"" in output:
+      info('\n### Passed: copy running to startup configuration ###\n')
+    else:
+      assert ("hostname CT-TEST" in output), \
+           "Failed: copy running to startup configuration"
 
 class Test_cfgdbutil:
-#if __name__ == '__main__':
-  # Create the Mininet topology based on mininet.
-  test = cfgdbUtilTests()
-
   def setup(self):
     pass
 
@@ -130,6 +166,7 @@ class Test_cfgdbutil:
     pass
 
   def setup_class(cls):
+    Test_cfgdbutil.test = cfgdbUtilTests()
     pass
 
   def teardown_class(cls):
@@ -153,3 +190,11 @@ class Test_cfgdbutil:
   # Delete command tests.
   def test_delete_config_commands(self):
       self.test.cfgdbutils_delete_command()
+
+  # Copy running to startup config tests.
+  def test_cfgdbutils_copy_running_startup(self):
+      self.test.cfgdbutils_copy_running_startup()
+
+  # Copy startup to  running config tests.
+  def test_cfgdbutils_copy_startup_running(self):
+      self.test.cfgdbutils_copy_startup_running()
