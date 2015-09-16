@@ -50,7 +50,7 @@ CONFIGDB = "/var/local/openvswitch/config.db"
 OVSDB_CLIENT_TRANSACT_CMD = "/usr/bin/ovsdb-client -v transact "
 ADD_STARTUP_ROW_FILE = "./src/ops-cfgd/tests/add_startup_row"
 ADD_TEST_ROW_FILE = "./src/ops-cfgd/tests/add_test_row"
-GET_OPEN_VSWITCH_TABLE_CMD = "ovs-vsctl list open_vswitch"
+GET_SYSTEM_TABLE_CMD = "ovs-vsctl list system"
 
 '''
 For now, only one function by the name of test is supported. To enable
@@ -95,7 +95,7 @@ class cfgdTest( HalonTest ):
         debug(self.create_db(switch, CREATE_CONFIGDB_CMD))
 
     def chk_cur_next_cfg(self, switch):
-        table_out = switch.cmd(GET_OPEN_VSWITCH_TABLE_CMD)
+        table_out = switch.cmd(GET_SYSTEM_TABLE_CMD)
         table_out += switch.cmd("echo")
         mylines = table_out.splitlines()
 
@@ -210,7 +210,7 @@ class cfgdTest( HalonTest ):
         out += switch.cmd("echo")
         debug(out)
 
-        # Get the contents of the Open_vSwitch table
+        # Get the contents of the System table
         if not self.chk_cur_next_cfg(switch):
             assert(self.chk_cur_next_cfg(switch)), \
                   "Failed:cur/next cfg not properly set"

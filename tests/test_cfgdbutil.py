@@ -125,8 +125,8 @@ class cfgdbUtilTests( HalonTest ):
     output = output[:output.rindex('}') + 1 ]
 
     parsed =json.loads(output)
-    openvswitch = parsed["Open_vSwitch"]
-    for key, value in openvswitch.iteritems():
+    system = parsed["System"]
+    for key, value in system.iteritems():
       hostname = value['hostname']
       break
 

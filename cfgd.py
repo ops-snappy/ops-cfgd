@@ -69,10 +69,10 @@ def unixctl_exit(conn, unused_argv, unused_aux):
 #------------------ db_is_cur_cfg_set() ----------------
 def db_is_cur_cfg_set(data):
     '''
-    Check to see if the Open_vSwitch:cur_cfg value exists and is > 0
+    Check to see if the System:cur_cfg value exists and is > 0
     '''
 
-    for ovs_rec in data["Open_vSwitch"].rows.itervalues():
+    for ovs_rec in data["System"].rows.itervalues():
         if ovs_rec.cur_cfg:
             if ovs_rec.cur_cfg > 0:
                 return True
@@ -84,10 +84,10 @@ def db_is_cur_cfg_set(data):
 #------------------ db_get_hw_done() ----------------
 def db_get_hw_done(data):
     '''
-    Check to see if the Open_vSwitch:cur_hw value exists and is > 0
+    Check to see if the System:cur_hw value exists and is > 0
     '''
 
-    for ovs_rec in data["Open_vSwitch"].rows.itervalues():
+    for ovs_rec in data["System"].rows.itervalues():
         if ovs_rec.cur_hw:
             if ovs_rec.cur_hw == 0:
                 return False
@@ -233,7 +233,7 @@ def mark_completion():
     txn = ovs.db.idl.Transaction(idl)
 
     # modify the values
-    for ovs_rec in idl.tables["Open_vSwitch"].rows.itervalues():
+    for ovs_rec in idl.tables["System"].rows.itervalues():
         ovs_rec.cur_cfg += 1
         ovs_rec.next_cfg = ovs_rec.cur_cfg
 
@@ -335,7 +335,7 @@ def main():
     check_for_startup_config(remote)
 
     schema_helper = ovs.db.idl.SchemaHelper(location=ovs_schema)
-    schema_helper.register_columns("Open_vSwitch", \
+    schema_helper.register_columns("System", \
             ["cur_hw", "cur_cfg", "next_cfg"])
 
     idl = ovs.db.idl.Idl(remote, schema_helper)
