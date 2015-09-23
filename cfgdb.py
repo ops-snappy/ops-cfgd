@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2010, 2011, 2012, 2013 Nicira, Inc.
+# (C) Copyright 2015 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,10 +26,10 @@ vlog = ovs.vlog.Vlog("cfgdb")
 
 # ovs definitions
 idl = None
-# HALON_TODO: Need to pull this from the build env
+# OPS_TODO: Need to pull this from the build env
 def_db = 'unix:/var/run/openvswitch/db.sock'
 
-# HALON_TODO: Need to pull this from the build env
+# OPS_TODO: Need to pull this from the build env
 cfgdb_schema = '/usr/share/openvswitch/configdb.ovsschema'
 
 max_time_to_wait_for_config_data = 30
@@ -45,6 +45,7 @@ WRITER = "writer"
 DATE = "date"
 HARDWARE = "hardware"
 
+
 class Cfgdb(object):
     def __init__(self, location=None):
         '''
@@ -57,8 +58,9 @@ class Cfgdb(object):
         self.idl = None
         self.txn = None
         self.schema_helper = ovs.db.idl.SchemaHelper(location=cfgdb_schema)
-        self.schema_helper.register_columns(CONFIG_TABLE, \
-            [TYPE, NAME, WRITER, DATE, CONFIG, HARDWARE])
+        self.schema_helper.register_columns(CONFIG_TABLE,
+                                            [TYPE, NAME, WRITER,
+                                             DATE, CONFIG, HARDWARE])
 
         self.idl = ovs.db.idl.Idl(def_db, self.schema_helper)
 
@@ -97,31 +99,31 @@ class Cfgdb(object):
     def __set_column_value(self, row):
         status = "Invalid"
 
-        if self.config != None:
+        if self.config is not None:
             setattr(row, CONFIG, self.config)
 
         #Currently only "startup" type is supported
-        if self.type != "startup":
+        if self.type is not "startup":
             return status
-        else :
+        else:
             setattr(row, TYPE, self.type)
             status = "success"
 
-        if self.name != None:
+        if self.name is not None:
             setattr(row, NAME, self.name)
 
-        if self.writer != None:
+        if self.writer is not None:
             setattr(row, WRITER, self.writer)
 
-        if self.date != None:
+        if self.date is not None:
             setattr(row, DATE, self.date)
 
-        if self.hardware != None:
+        if self.hardware is not None:
             setattr(row, HARDWARE, self.hardware)
 
         return status
 
-    def insert_row(self) :
+    def insert_row(self):
         '''
         Insert a new row in configdb and update the columns with
         user values (default values are taken if columns values
@@ -132,14 +134,14 @@ class Cfgdb(object):
 
         status = self.__set_column_value(row)
 
-        if (status != "success"):
+        if (status is not "success"):
             return None, status
-        else :
+        else:
             status = self.txn.commit_block()
 
         return row, status
 
-    def update_row(self, row) :
+    def update_row(self, row):
         '''
         Update the row with the latest modified values.
         '''
@@ -147,21 +149,21 @@ class Cfgdb(object):
 
         status = self.__set_column_value(row)
 
-        if (status != "success"):
+        if (status is not "success"):
             return None, status
-        else :
+        else:
             status = self.txn.commit_block()
 
         return row, status
 
     '''
-    HALON_TODO: This probably should be by TYPE and NAME. In
+    OPS_TODO: This probably should be by TYPE and NAME. In
     the future we could possibly have multiple row of same
     type with different names. However, currently we support
     only one row and "startup" is supposed to be a "one only"
     type so there is no ambiguity of which is the startup config.
     '''
-    def delete_row_by_type(self,cfgtype):
+    def delete_row_by_type(self, cfgtype):
         '''
         Delete a specific row from configdb based on
         config type passed as argument
@@ -177,7 +179,7 @@ class Cfgdb(object):
             row.delete()
             status = self.txn.commit_block()
 
-        return status ,row_found
+        return status, row_found
 
     def close(self):
-         self.idl.close()
+        self.idl.close()

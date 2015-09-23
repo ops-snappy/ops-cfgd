@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (C) 2014-2015 Hewlett-Packard Development Company, L.P.
+# (C) Copyright 2015 Hewlett Packard Enterprise Development LP
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -37,16 +37,17 @@ from halonlib import restparser
 
 # ovs definitions
 idl = None
-# HALON_TODO: Need to pull this from the build env
+# OPS_TODO: Need to pull this from the build env
 def_db = 'unix:/var/run/openvswitch/db.sock'
 
 # Configuration file definitions
 saved_config = None
-# HALON_TODO: Need to pull these three from the build env
+# OPS_TODO: Need to pull these three from the build env
 cfgdb_schema = '/usr/share/openvswitch/configdb.ovsschema'
 ovs_schema = '/usr/share/openvswitch/vswitch.ovsschema'
 type_startup_config = "startup"
-max_miliseconds_to_wait_for_config_data = 30  #3 sec max retry
+#3 sec max retry
+max_miliseconds_to_wait_for_config_data = 30
 
 # Program control
 exiting = False
@@ -66,6 +67,7 @@ def unixctl_exit(conn, unused_argv, unused_aux):
     exiting = True
     conn.reply(None)
 
+
 #------------------ db_is_cur_cfg_set() ----------------
 def db_is_cur_cfg_set(data):
     '''
@@ -81,6 +83,7 @@ def db_is_cur_cfg_set(data):
 
     return False
 
+
 #------------------ db_get_hw_done() ----------------
 def db_get_hw_done(data):
     '''
@@ -95,6 +98,7 @@ def db_get_hw_done(data):
                 return True
 
     return False
+
 
 #------------------ wait_for_hw_done() ----------------
 def wait_for_hw_done():
@@ -119,6 +123,7 @@ def wait_for_hw_done():
         # Delay a little before trying again
         sleep(0.2)
         return False
+
 
 #------------------ get_config() ----------------
 def get_config(idl_cfg):
@@ -148,6 +153,7 @@ def get_config(idl_cfg):
 
     if not tbl_found:
         vlog.info("No rows found in the config table")
+
 
 #------------------ check_for_startup_config() ----------------
 def check_for_startup_config(remote):
@@ -179,8 +185,8 @@ def check_for_startup_config(remote):
 
     return
 
-#####################  Utility Methods ######################
 
+#####################  Utility Methods ######################
 #------------------ push_config_to_db() ----------------
 def push_config_to_db():
     '''
@@ -190,19 +196,20 @@ def push_config_to_db():
 
     global saved_config
 
-    if saved_config == None:
+    if saved_config is None:
         vlog.info('No saved configuration exists')
     else:
-        #HALON_TODO: Change this log msg to the actual push code when available
+        #OPS_TODO: Change this log msg to the actual push code when available
         vlog.info('Config data found')
-        try :
+        try:
             data = json.loads(saved_config)
         except ValueError, e:
             print("Invalid json from configdb. Exception: %s\n" % e)
             return
 
         # set up IDL
-        manager = OvsdbConnectionManager(settings.get('ovs_remote'), settings.get('ovs_schema'))
+        manager = OvsdbConnectionManager(settings.get('ovs_remote'),
+                                         settings.get('ovs_schema'))
         manager.start()
         manager.idl.run()
 
@@ -219,6 +226,7 @@ def push_config_to_db():
         run_config_util.write_config_to_db(data)
 
     return True
+
 
 #------------------ mark_completion() ----------------
 def mark_completion():
@@ -243,6 +251,7 @@ def mark_completion():
 
     return True
 
+
 #------------------ terminate() ----------------
 def terminate():
     global exiting
@@ -250,8 +259,8 @@ def terminate():
     exiting = True
     return True
 
-###################  Main Loop Serializing Methods ###############
 
+###################  Main Loop Serializing Methods ###############
 def init_dispatcher():
     '''
     Creates a list of functions to call in sequence
@@ -275,6 +284,7 @@ def init_dispatcher():
 
     loop_seq_no = 0
 
+
 def dispatcher():
     '''
     Call next funtion in the list
@@ -291,7 +301,7 @@ def dispatcher():
         if rc:
             loop_seq_no += 1
     else:
-         exiting = True
+        exiting = True
 
 
 ###############################  main  ###########################
@@ -335,8 +345,8 @@ def main():
     check_for_startup_config(remote)
 
     schema_helper = ovs.db.idl.SchemaHelper(location=ovs_schema)
-    schema_helper.register_columns("System", \
-            ["cur_hw", "cur_cfg", "next_cfg"])
+    schema_helper.register_columns("System",
+                                   ["cur_hw", "cur_cfg", "next_cfg"])
 
     idl = ovs.db.idl.Idl(remote, schema_helper)
 
@@ -362,7 +372,7 @@ def main():
 
         # Keeping this here for later when we don't terminate.
         '''
-        # HALON_TODO: when we want to keep cfgd running, add code
+        # OPS_TODO: when we want to keep cfgd running, add code
         # ...to know when the dispatcher is through and then start
         # ...using this code to block on a db change.
         if seqno == idl.change_seqno:

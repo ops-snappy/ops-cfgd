@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (C) 2014-2015 Hewlett-Packard Development Company, L.P.
+# (C) Copyright 2015 Hewlett Packard Enterprise Development LP
 # All Rights Reserved.
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -34,12 +34,28 @@ from halonvsi.halon import *
 
 #OVS_VSCTL = "/usr/bin/ovs-vsctl "
 
-ALL_DAEMONS = "sysd pmd tempd powerd ledd fand cfgd switchd intfd vland lacpd lldpd zebra bgpd ovsdb-server"
-PLATFORM_DAEMONS = "sysd pmd tempd powerd ledd fand"
-CREATE_OVSDB_CMD = "/usr/bin/ovsdb-tool create /var/run/openvswitch/ovsdb.db /usr/share/openvswitch/vswitch.ovsschema"
-CREATE_CONFIGDB_CMD = "/usr/bin/ovsdb-tool create /var/local/openvswitch/config.db /usr/share/openvswitch/configdb.ovsschema"
-OVSDB_STARTUP_CMD_NORMAL = "/usr/sbin/ovsdb-server --remote=punix:/var/run/openvswitch/db.sock --detach --no-chdir --pidfile -vSYSLOG:INFO /var/run/openvswitch/ovsdb.db /var/local/openvswitch/config.db"
-OVSDB_STARTUP_CMD_NO_CONFIGDB = "/usr/sbin/ovsdb-server --remote=punix:/var/run/openvswitch/db.sock --detach --no-chdir --pidfile -vSYSLOG:INFO /var/run/openvswitch/ovsdb.db"
+ALL_DAEMONS = "ops-sysd ops-pmd ops-tempd ops-powerd ops-ledd ops-fand"\
+              " cfgd switchd ops-intfd ops-vland ops-lacpd"\
+              " lldpd zebra bgpd ovsdb-server"
+
+PLATFORM_DAEMONS = "ops-sysd ops-pmd ops-tempd ops-powerd ops-ledd ops-fand"
+
+CREATE_OVSDB_CMD = "/usr/bin/ovsdb-tool create /var/run/openvswitch/ovsdb.db"\
+                   " /usr/share/openvswitch/vswitch.ovsschema"
+
+CREATE_CONFIGDB_CMD = "/usr/bin/ovsdb-tool create /var/local/openvswitch/"\
+                      "config.db /usr/share/openvswitch/configdb.ovsschema"
+
+OVSDB_STARTUP_CMD_NORMAL = "/usr/sbin/ovsdb-server --remote=punix:/var/run/"\
+                           "openvswitch/db.sock --detach --no-chdir --pidfile"\
+                           " -vSYSLOG:INFO /var/run/openvswitch/ovsdb.db "\
+                           "/var/local/openvswitch/config.db"
+
+OVSDB_STARTUP_CMD_NO_CONFIGDB = "/usr/sbin/ovsdb-server --remote=punix:/var/"\
+                                "run/openvswitch/db.sock --detach --no-chdir"\
+                                " --pidfile -vSYSLOG:INFO "\
+                                "/var/run/openvswitch/ovsdb.db"
+
 OVSDB_STOP_CMD = "kill -9 `cat /var/run/openvswitch/ovsdb-server.pid`"
 CFGD_CMD = "/usr/bin/cfgd"
 CFG_TBL_NOT_FOUND_MSG = "No rows found in the config table"
@@ -59,9 +75,7 @@ main test function.
 '''
 
 
-class cfgdTest( HalonTest ):
-
-
+class cfgdTest(HalonTest):
     def setupNet(self):
         # if you override this function, make sure to
         # either pass getNodeOpts() into hopts/sopts of the topology that
@@ -134,9 +148,10 @@ class cfgdTest( HalonTest ):
         time.sleep(0.1)
 
     def verify_no_configdb_detection(self):
-        info("\n########## Test to verify correctly cfgd  detects no configdb ##########")
+        info("\n########## Test to verify correctly cfgd  "
+             "detects no configdb ##########")
 
-        switch = self.net.switches [ 0 ]
+        switch = self.net.switches[0]
         self.restart_system(switch, "noconfig")
 
         # start cfgd
@@ -145,13 +160,13 @@ class cfgdTest( HalonTest ):
         if CFG_TBL_NOT_FOUND_MSG in out:
             info("\n### Passed: Correct msg received when no configdb ###")
         else:
-            assert ( CFG_TBL_NOT_FOUND_MSG in out ), \
-                    "Failed: Incorrect response when configdb missing.\n"
+            assert(CFG_TBL_NOT_FOUND_MSG in out), \
+                "Failed: Incorrect response when configdb missing.\n"
 
     def verify_connect_to_db(self):
         info("\n########## Test to verify connects to configdb ###########")
 
-        switch = self.net.switches [ 0 ]
+        switch = self.net.switches[0]
         self.restart_system(switch, "normal")
 
         # start cfgd
@@ -159,14 +174,16 @@ class cfgdTest( HalonTest ):
         debug(out)
 
         if CFG_TBL_NOT_FOUND_MSG in out:
-            info("\n### Passed: Correct msg received when no rows in config table ####")
+            info("\n### Passed: Correct msg received when"
+                 " no rows in config table ####")
         else:
-            assert ( CFG_TBL_NOT_FOUND_MSG in out ), \
-                    "Failed: Incorrect response when no rows in config table.\n"
+            assert(CFG_TBL_NOT_FOUND_MSG in out), \
+                "Failed: Incorrect response when no rows in config table.\n"
 
     def verify_find_startup_row(self):
-        info("\n########## Test to verify cfgd finds startup row in configdb ##########")
-        switch = self.net.switches [ 0 ]
+        info("\n########## Test to verify cfgd finds startup"
+             " row in configdb ##########")
+        switch = self.net.switches[0]
         self.restart_system(switch, "normal")
 
         # Add two rows to configdb, one type==startup, one type==testtype
@@ -192,15 +209,18 @@ class cfgdTest( HalonTest ):
         debug(out)
 
         if CFG_DATA_FOUND_MSG in out:
-            info("\n### Passed: Correct msg received when startup config in config table. ###")
+            info("\n### Passed: Correct msg received when "
+                 "startup config in config table. ###")
         else:
-            assert ( CFG_DATA_FOUND_MSG in out ), \
-                    "Failed: Incorrect response when startup config in config table.\n"
+            assert(CFG_DATA_FOUND_MSG in out), \
+                "Failed: Incorrect response when startup"\
+                " config in config table.\n"
 
     def verify_mark_completion(self):
-        info("\n########## Test to verify cur_cfg and next_cfg set > 0 #########")
+        info("\n########## Test to verify cur_cfg and "
+             "next_cfg set > 0 #########")
 
-        switch = self.net.switches [ 0 ]
+        switch = self.net.switches[0]
         # Init everything, but don't really need a config
         self.restart_system(switch, "normal")
 
@@ -213,13 +233,14 @@ class cfgdTest( HalonTest ):
         # Get the contents of the System table
         if not self.chk_cur_next_cfg(switch):
             assert(self.chk_cur_next_cfg(switch)), \
-                  "Failed:cur/next cfg not properly set"
+                "Failed:cur/next cfg not properly set"
         else:
             info("\n### Passed: cur_cfg, next_cfg properly set ###")
 
     def copy_start_running_on_bootup(self):
-        info("\n########## Test to copying startup to running config on bootup #########")
-        switch = self.net.switches [ 0 ]
+        info("\n########## Test to copying startup to "
+             "running config on bootup #########")
+        switch = self.net.switches[0]
 
         # Change hostname as CT-TEST in running db and copy the running
         # configuration to startup config. Now restart the system and
@@ -242,10 +263,12 @@ class cfgdTest( HalonTest ):
         output += switch.cmdCLI("end")
 
         if "hostname \"CT-TEST\"" in output:
-            info('\n### Passed: copy running to startup configuration on bootup ###\n')
+            info("\n### Passed: copy running to startup"
+                 " configuration on bootup ###\n")
         else:
-            assert ("hostname CT-TEST" in output), \
-                    "Failed: copy running to startup configuration on bootup"
+            assert("hostname CT-TEST" in output), \
+                "Failed: copy running to startup configuration on bootup"
+
 
 class Test_cfgdTest:
     def setup(self):

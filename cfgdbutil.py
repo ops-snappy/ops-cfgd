@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2009, 2010, 2011, 2012 Nicira, Inc.
+# (C) Copyright 2015 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ type_startup_config = "startup"
 
 vlog = ovs.vlog.Vlog("cfgmgmt")
 
+
 def show_config(args):
 
     if (args[0] != "startup-config"):
@@ -46,7 +47,7 @@ def show_config(args):
     row, tbl_found = cfg.find_row_by_type("startup")
 
     if tbl_found:
-        try :
+        try:
             parsed = json.loads(row.config)
             print("Startup configuration:")
             print json.dumps(parsed,  indent=4, sort_keys=True)
@@ -57,9 +58,11 @@ def show_config(args):
 
     cfg.close()
 
+
 def copy_running_startup():
     cfg = cfgdb.Cfgdb()
-    manager = OvsdbConnectionManager(settings.get('ovs_remote'), settings.get('ovs_schema'))
+    manager = OvsdbConnectionManager(settings.get('ovs_remote'),
+                                     settings.get('ovs_schema'))
     manager.start()
     idl = manager.idl
 
@@ -87,6 +90,7 @@ def copy_running_startup():
 
     cfg.close()
 
+
 def copy_startup_running():
     cfg = cfgdb.Cfgdb()
 
@@ -94,7 +98,7 @@ def copy_startup_running():
     row, tbl_found = cfg.find_row_by_type("startup")
 
     if tbl_found:
-        try :
+        try:
             data = json.loads(row.config)
         except ValueError, e:
             print("Invalid json from configdb. Exception: %s\n" % e)
@@ -106,7 +110,8 @@ def copy_startup_running():
         return
 
     # set up IDL
-    manager = OvsdbConnectionManager(settings.get('ovs_remote'), settings.get('ovs_schema'))
+    manager = OvsdbConnectionManager(settings.get('ovs_remote'),
+                                     settings.get('ovs_schema'))
     manager.start()
     manager.idl.run()
 
@@ -123,13 +128,15 @@ def copy_startup_running():
     run_config_util.write_config_to_db(data)
     cfg.close()
 
+
 def copy_config(args):
     if (args[0] == "running-config" and args[1] == "startup-config"):
         copy_running_startup()
-    elif (args[0] == "startup-config" and args[1] =="running-config"):
+    elif (args[0] == "startup-config" and args[1] == "running-config"):
         copy_startup_running()
-    else :
+    else:
         print("Unknow config (use --help for help)")
+
 
 def delete_config(args):
     if (args[0] != "startup-config"):
@@ -139,14 +146,15 @@ def delete_config(args):
     cfg = cfgdb.Cfgdb()
 
     #HALON TODO: To get confg type from user from user as args
-    status , tbl_found = cfg.delete_row_by_type("startup")
+    status, tbl_found = cfg.delete_row_by_type("startup")
 
     if tbl_found:
         print("Delete statup row status : %s" % status)
-    else :
+    else:
         print('No saved configuration exists')
 
     cfg.close()
+
 
 def usage(name):
     print (
@@ -160,16 +168,18 @@ def usage(name):
         copy start-config running-config \n\
             Copy startup config to running config)\n\n\
         delete startup-config \n\
-            Delete the startup configuration row in configdb\n\n" % (name,name))
+            Delete the startup configuration row in configdb\n\n"
+        % (name, name))
+
 
 def main():
     argv = sys.argv
     program_name = argv[0]
 
-    try :
-        options, args = getopt.gnu_getopt(argv[1:], 'h',['help'])
+    try:
+        options, args = getopt.gnu_getopt(argv[1:], 'h', ['help'])
     except getopt.GetoptError, geo:
-        print("%s: %s\n" %(program_name, geo.msg))
+        print("%s: %s\n" % (program_name, geo.msg))
         return
 
     for key, value in options:
@@ -178,40 +188,44 @@ def main():
             return
 
     if not args:
-        print("%s: missing command argument (use --help for help)\n" % program_name)
+        print("%s: missing command argument (use --help for help)\n"
+              % program_name)
         return
 
     #Command Dictionary with command name as key and key value as list
     #with functions and corresponding argument length
-    commands = { "show" : (show_config, 1),
-                 "copy": (copy_config, 2),
-                 "delete" : (delete_config, 1) }
+    commands = {"show":   (show_config, 1),
+                "copy":   (copy_config, 2),
+                "delete": (delete_config, 1)}
 
     command_name = args[0]
     args = args[1:]
 
     if not command_name in commands:
-        print("%s: unknown command \'%s\' (use --help for help)\n" % (program_name,command_name))
+        print("%s: unknown command \'%s\' (use --help for help)\n"
+              % (program_name, command_name))
         return
 
     func, n_args = commands[command_name]
     if type(n_args) == tuple:
         if len(args) < n_args[0]:
-            print("%s: \"%s\" requires at least %d arguments but only %d provided (use --help for help)\n" \
-                             % (program_name, command_name, n_args, len(args)))
+            print("%s: \"%s\" requires at least %d arguments but "
+                  "only %d provided (use --help for help)\n"
+                  % (program_name, command_name, n_args, len(args)))
             return
     elif type(n_args) == int:
         if len(args) != n_args:
-            print("%s: \"%s\" requires %d arguments but %d provided (use --help for help)\n" \
-                             % (program_name, command_name, n_args, len(args)))
+            print("%s: \"%s\" requires %d arguments but %d provided "
+                  "(use --help for help)\n"
+                  % (program_name, command_name, n_args, len(args)))
             return
     else:
-        assert False, ("Invalid data in argument length %s %s" %(func, n_args))
+        assert False, ("Invalid argument length %s %s" % (func, n_args))
 
     func(args)
 
 if __name__ == '__main__':
-    try :
+    try:
         main()
     except error.Error, e:
         print("Error: \"%s\" \n" % e)
