@@ -35,8 +35,8 @@ from opsvsi.opsvsitest import *
 #OVS_VSCTL = "/usr/bin/ovs-vsctl "
 
 ALL_DAEMONS = "ops-sysd ops-pmd ops-tempd ops-powerd ops-ledd ops-fand"\
-              " cfgd switchd ops-intfd ops-vland ops-lacpd"\
-              " lldpd zebra bgpd ovsdb-server"
+              " ops_cfgd switchd ops-intfd ops-vland ops-lacpd"\
+              " ops-lldpd ops-zebra ops-bgpd ovsdb-server"
 
 PLATFORM_DAEMONS = "ops-sysd ops-pmd ops-tempd ops-powerd ops-ledd ops-fand"
 
@@ -57,7 +57,7 @@ OVSDB_STARTUP_CMD_NO_CONFIGDB = "/usr/sbin/ovsdb-server --remote=punix:/var/"\
                                 "/var/run/openvswitch/ovsdb.db"
 
 OVSDB_STOP_CMD = "kill -9 `cat /var/run/openvswitch/ovsdb-server.pid`"
-CFGD_CMD = "/usr/bin/cfgd"
+CFGD_CMD = "/usr/bin/ops_cfgd"
 CFG_TBL_NOT_FOUND_MSG = "No rows found in the config table"
 CFG_DATA_FOUND_MSG = "Config data found"
 CUR_CFG_SET_MSG = "cur_cfg already set"
@@ -148,13 +148,13 @@ class cfgdTest(OpsVsiTest):
         time.sleep(0.1)
 
     def verify_no_configdb_detection(self):
-        info("\n########## Test to verify correctly cfgd  "
+        info("\n########## Test to verify correctly ops_cfgd  "
              "detects no configdb ##########")
 
         switch = self.net.switches[0]
         self.restart_system(switch, "noconfig")
 
-        # start cfgd
+        # start ops_cfgd
         out = switch.cmd(CFGD_CMD)
         debug(out)
         if CFG_TBL_NOT_FOUND_MSG in out:
@@ -169,7 +169,7 @@ class cfgdTest(OpsVsiTest):
         switch = self.net.switches[0]
         self.restart_system(switch, "normal")
 
-        # start cfgd
+        # start ops_cfgd
         out = switch.cmd(CFGD_CMD)
         debug(out)
 
@@ -181,7 +181,7 @@ class cfgdTest(OpsVsiTest):
                 "Failed: Incorrect response when no rows in config table.\n"
 
     def verify_find_startup_row(self):
-        info("\n########## Test to verify cfgd finds startup"
+        info("\n########## Test to verify ops_cfgd finds startup"
              " row in configdb ##########")
         switch = self.net.switches[0]
         self.restart_system(switch, "normal")
@@ -200,7 +200,7 @@ class cfgdTest(OpsVsiTest):
         debug(switch.cmd(test_row))
         debug(switch.cmd("echo"))
 
-        # start cfgd
+        # start ops_cfgd
         out = switch.cmd(CFGD_CMD)
         #OPS_TODO: Need to replace the sleep with a workable solution
         #            in the test infrastructure.
@@ -224,7 +224,7 @@ class cfgdTest(OpsVsiTest):
         # Init everything, but don't really need a config
         self.restart_system(switch, "normal")
 
-        # Run cfgd
+        # Run ops_cfgd
         out = switch.cmd(CFGD_CMD)
         sleep(5)
         out += switch.cmd("echo")
@@ -253,13 +253,14 @@ class cfgdTest(OpsVsiTest):
 
         self.restart_system(switch, "normal")
 
-        # Run cfgd
+        # Run ops_cfgd
         out = switch.cmd(CFGD_CMD)
         sleep(5)
         out += switch.cmd("echo")
         debug(out)
 
         output = switch.cmdCLI("show running-config")
+        sleep(5)
         output += switch.cmdCLI("end")
 
         if "hostname \"CT-TEST\"" in output:

@@ -33,13 +33,14 @@ import cfgdb
 type_startup_config = "startup"
 
 vlog = ovs.vlog.Vlog("cfgmgmt")
+TEMPORARY_DB_SHOW_STARTUP = "unix:/var/run/openvswitch/temp_startup.sock"
 
 
 def show_config(args):
-
+    ret = True
     if (args[0] != "startup-config"):
         print("Unknown config \"%s\" (Use --help for help)" % args[0])
-        return
+        return False
 
     cfg = cfgdb.Cfgdb()
 
@@ -47,16 +48,37 @@ def show_config(args):
     row, tbl_found = cfg.find_row_by_type("startup")
 
     if tbl_found:
-        try:
+        try :
+            # Here we copy saved configuration from config DB to temporary DB
+            # and the current startup configuration command displays output
+            # by traversing the temporary DB.
             parsed = json.loads(row.config)
             print("Startup configuration:")
-            print json.dumps(parsed,  indent=4, sort_keys=True)
+            manager = OvsdbConnectionManager(TEMPORARY_DB_SHOW_STARTUP,
+                                             settings.get('ovs_schema'))
+            manager.start()
+            cnt = 30
+            while not manager.idl.run() and cnt > 0:
+                time.sleep(.1)
+                cnt -= 1
+            if cnt <= 0:
+                print("IDL connection timeout")
+                return False
+            # read the schema
+            schema = restparser.parseSchema(settings.get('ext_schema'))
+            run_config_util = RunConfigUtil(manager.idl, schema)
+            run_config_util.write_config_to_db(parsed)
+            manager.idl.close()
+
         except ValueError, e:
             print("Invalid json from configdb. Exception: %s\n" % e)
+            ret = False
     else:
         print('No saved configuration exists')
+        ret = False
 
     cfg.close()
+    return ret
 
 
 def copy_running_startup():
@@ -89,6 +111,7 @@ def copy_running_startup():
         cfg.insert_row()
 
     cfg.close()
+    return True
 
 
 def copy_startup_running():
@@ -103,11 +126,11 @@ def copy_startup_running():
         except ValueError, e:
             print("Invalid json from configdb. Exception: %s\n" % e)
             cfg.close()
-            return
+            return False
     else:
         print('No saved configuration exists')
         cfg.close()
-        return
+        return False
 
     # set up IDL
     manager = OvsdbConnectionManager(settings.get('ovs_remote'),
@@ -127,21 +150,25 @@ def copy_startup_running():
     run_config_util = RunConfigUtil(manager.idl, schema)
     run_config_util.write_config_to_db(data)
     cfg.close()
+    return True
 
 
 def copy_config(args):
+    ret = True
     if (args[0] == "running-config" and args[1] == "startup-config"):
-        copy_running_startup()
+        ret = copy_running_startup()
     elif (args[0] == "startup-config" and args[1] == "running-config"):
-        copy_startup_running()
-    else:
+        ret = copy_startup_running()
+    else :
         print("Unknow config (use --help for help)")
+        ret = False
+    return ret
 
 
 def delete_config(args):
     if (args[0] != "startup-config"):
         print("Unknown config \"%s\" (Use --help for help)" % args[0])
-        return
+        return False
 
     cfg = cfgdb.Cfgdb()
 
@@ -152,8 +179,11 @@ def delete_config(args):
         print("Delete statup row status : %s" % status)
     else:
         print('No saved configuration exists')
+        cfg.close()
+        return False
 
     cfg.close()
+    return True
 
 
 def usage(name):
@@ -180,17 +210,17 @@ def main():
         options, args = getopt.gnu_getopt(argv[1:], 'h', ['help'])
     except getopt.GetoptError, geo:
         print("%s: %s\n" % (program_name, geo.msg))
-        return
+        sys.exit(2)
 
     for key, value in options:
         if key in ['-h', '--help']:
             usage(program_name)
-            return
+            sys.exit(0)
 
     if not args:
         print("%s: missing command argument (use --help for help)\n"
               % program_name)
-        return
+        sys.exit(2)
 
     #Command Dictionary with command name as key and key value as list
     #with functions and corresponding argument length
@@ -204,7 +234,7 @@ def main():
     if not command_name in commands:
         print("%s: unknown command \'%s\' (use --help for help)\n"
               % (program_name, command_name))
-        return
+        sys.exit(2)
 
     func, n_args = commands[command_name]
     if type(n_args) == tuple:
@@ -212,17 +242,18 @@ def main():
             print("%s: \"%s\" requires at least %d arguments but "
                   "only %d provided (use --help for help)\n"
                   % (program_name, command_name, n_args, len(args)))
-            return
+            sys.exit(2)
     elif type(n_args) == int:
         if len(args) != n_args:
             print("%s: \"%s\" requires %d arguments but %d provided "
                   "(use --help for help)\n"
                   % (program_name, command_name, n_args, len(args)))
-            return
+            sys.exit(2)
     else:
         assert False, ("Invalid argument length %s %s" % (func, n_args))
 
-    func(args)
+    if func(args) == False:
+        sys.exit(2)
 
 if __name__ == '__main__':
     try:

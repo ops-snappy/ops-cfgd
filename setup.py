@@ -16,10 +16,10 @@
 
 from setuptools import setup
 setup(
-    name='cfgd',
+    name='ops_cfgd',
     version='1.0',
-    py_modules=['cfgd','cfgdbutil','cfgdb'],
+    py_modules=['ops_cfgd','cfgdbutil','cfgdb'],
     entry_points={
-        'console_scripts': ['cfgd = cfgd:main','cfgdbutil = cfgdbutil:main']
+        'console_scripts': ['ops_cfgd = ops_cfgd:main','cfgdbutil = cfgdbutil:main']
     }
 )
