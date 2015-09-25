@@ -24,12 +24,12 @@ if 'BUILD_ROOT' in os.environ:
 else:
     BUILD_ROOT = "../../.."
 
-HALON_VSI_LIB = BUILD_ROOT + "/src/halon-vsi"
-sys.path.append(HALON_VSI_LIB)
+OPS_VSI_LIB = BUILD_ROOT + "/src/ops-vsi"
+sys.path.append(OPS_VSI_LIB)
 
 import mininet
-from halonvsi.docker import *
-from halonvsi.halon import *
+from opsvsi.docker import *
+from opsvsi.opsvsitest import *
 
 
 #OVS_VSCTL = "/usr/bin/ovs-vsctl "
@@ -75,7 +75,7 @@ main test function.
 '''
 
 
-class cfgdTest(HalonTest):
+class cfgdTest(OpsVsiTest):
     def setupNet(self):
         # if you override this function, make sure to
         # either pass getNodeOpts() into hopts/sopts of the topology that
@@ -84,9 +84,9 @@ class cfgdTest(HalonTest):
             k=1,
             hopts=self.getHostOpts(),
             sopts=self.getSwitchOpts()),
-            switch=HalonSwitch,
-            host=HalonHost,
-            link=HalonLink,
+            switch=VsiOpenSwitch,
+            host=Host,
+            link=OpsVsiLink,
             controller=None,
             build=True)
 
@@ -202,7 +202,7 @@ class cfgdTest(HalonTest):
 
         # start cfgd
         out = switch.cmd(CFGD_CMD)
-        #HALON_TODO: Need to replace the sleep with a workable solution
+        #OPS_TODO: Need to replace the sleep with a workable solution
         #            in the test infrastructure.
         sleep(5)
         out += switch.cmd("echo")

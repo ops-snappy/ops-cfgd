@@ -14,9 +14,9 @@
 # limitations under the License.
 
 from runconfig.runconfig import RunConfigUtil
-from halonrest.settings import settings
-from halonrest.manager import OvsdbConnectionManager
-from halonlib import restparser
+from opsrest.settings import settings
+from opsrest.manager import OvsdbConnectionManager
+from opslib import restparser
 
 import getopt
 import os
@@ -43,7 +43,7 @@ def show_config(args):
 
     cfg = cfgdb.Cfgdb()
 
-    #HALON TODO: To get confg type from user as args
+    #OPS TODO: To get confg type from user as args
     row, tbl_found = cfg.find_row_by_type("startup")
 
     if tbl_found:
@@ -94,7 +94,7 @@ def copy_running_startup():
 def copy_startup_running():
     cfg = cfgdb.Cfgdb()
 
-    #HALON TODO: To get confg type from user as args
+    #OPS TODO: To get confg type from user as args
     row, tbl_found = cfg.find_row_by_type("startup")
 
     if tbl_found:
@@ -145,7 +145,7 @@ def delete_config(args):
 
     cfg = cfgdb.Cfgdb()
 
-    #HALON TODO: To get confg type from user from user as args
+    #OPS TODO: To get confg type from user from user as args
     status, tbl_found = cfg.delete_row_by_type("startup")
 
     if tbl_found:

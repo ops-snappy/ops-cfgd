@@ -31,9 +31,9 @@ import ovs.unixctl.server
 import ovs.vlog
 
 from runconfig.runconfig import RunConfigUtil
-from halonrest.settings import settings
-from halonrest.manager import OvsdbConnectionManager
-from halonlib import restparser
+from opsrest.settings import settings
+from opsrest.manager import OvsdbConnectionManager
+from opslib import restparser
 
 # ovs definitions
 idl = None

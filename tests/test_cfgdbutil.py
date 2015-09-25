@@ -20,14 +20,14 @@ import time
 import pytest
 import subprocess
 import json
-from halonvsi.docker import *
-from halonvsi.halon import *
+from opsvsi.docker import *
+from opsvsi.opsvsitest import *
 
 ADD_STARTUP_ROW_FILE = "./src/ops-cfgd/tests/add_startup_row"
 JSON_CONFIG_STRING = "{\"config-type\":\"test\"}"
 
 
-class cfgdbUtilTests(HalonTest):
+class cfgdbUtilTests(OpsVsiTest):
 
     def setupNet(self):
         # if you override this function, make sure to
@@ -37,14 +37,14 @@ class cfgdbUtilTests(HalonTest):
             k=1,
             hopts=self.getHostOpts(),
             sopts=self.getSwitchOpts()),
-            switch=HalonSwitch,
-            host=HalonHost,
-            link=HalonLink, controller=None,
+            switch=VsiOpenSwitch,
+            host=Host,
+            link=OpsVsiLink, controller=None,
             build=True)
 
     def insert_startup_config(self):
-        #configuring Halon, in the future it would be through
-        #proper Halon commands
+        #configuring Ops, in the future it would be through
+        #proper Ops commands
         s1 = self.net.switches[0]
 
         #Add one rows to configdb of type==startup
@@ -55,8 +55,8 @@ class cfgdbUtilTests(HalonTest):
 
     def cfgdbutils_delete_command(self):
         info('\n########## Test cfgdbutils delete commands ##########')
-        #configuring Halon, in the future it would be through
-        #proper Halon commands
+        #configuring Ops, in the future it would be through
+        #proper Ops commands
         s1 = self.net.switches[0]
 
         info('\n### Delete startup config saved in configdb ###')
@@ -77,8 +77,8 @@ class cfgdbUtilTests(HalonTest):
         info('\n########## Test cfgdbutils show commands ##########')
 
         self.insert_startup_config()
-        #configuring Halon, in the future it would be through
-        #proper Halon commands
+        #configuring Ops, in the future it would be through
+        #proper Ops commands
         s1 = self.net.switches[0]
 
         # Note: I have to use the extra "end" CLI command to flush out
