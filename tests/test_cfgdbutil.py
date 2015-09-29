@@ -23,6 +23,7 @@ import json
 from opsvsi.docker import *
 from opsvsi.opsvsitest import *
 
+
 class cfgdbUtilTests(OpsVsiTest):
 
     def setupNet(self):
@@ -77,9 +78,9 @@ class cfgdbUtilTests(OpsVsiTest):
            "radius-server host 1.1.1.1" in output:
             info('\n### Passed: Fetch startup configuration success ###')
         else:
-            assert ("lldp holdtime 9" in output and \
-                    "radius-server host 1.1.1.1" in output), \
-                    "Failed: To fetch startup configuration"
+            assert ("lldp holdtime 9" in output and
+                    "radius-server host 1.1.1.1" in output),\
+                "Failed: To fetch startup configuration"
 
     def cfgdbutils_copy_running_startup(self):
         info('\n########## Test copy running to startup config ##########')
@@ -112,10 +113,12 @@ class cfgdbUtilTests(OpsVsiTest):
         # Change hostname as openswitch in running db and copy the startup
         # configuration to running config and verify in show running config
         # that hostname is again changed to CT-TEST.
-        s1.cmdCLI("configure terminal")
-        s1.cmdCLI("hostname openswitch")
-        s1.cmdCLI("exit")
-        s1.cmdCLI("copy startup-config  running-config")
+        out = s1.cmdCLI("configure terminal")
+        out += s1.cmdCLI("hostname openswitch")
+        out += s1.cmdCLI("exit")
+        sleep(10)
+        out += s1.cmdCLI("copy startup-config running-config")
+        debug(out)
 
         output = s1.cmdCLI("show running-config")
         output += s1.cmdCLI("end")

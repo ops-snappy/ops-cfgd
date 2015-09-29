@@ -48,7 +48,7 @@ def show_config(args):
     row, tbl_found = cfg.find_row_by_type("startup")
 
     if tbl_found:
-        try :
+        try:
             # Here we copy saved configuration from config DB to temporary DB
             # and the current startup configuration command displays output
             # by traversing the temporary DB.
@@ -136,8 +136,6 @@ def copy_startup_running():
     manager = OvsdbConnectionManager(settings.get('ovs_remote'),
                                      settings.get('ovs_schema'))
     manager.start()
-    manager.idl.run()
-
     init_seq_no = manager.idl.change_seqno
     while True:
         manager.idl.run()
@@ -159,7 +157,7 @@ def copy_config(args):
         ret = copy_running_startup()
     elif (args[0] == "startup-config" and args[1] == "running-config"):
         ret = copy_startup_running()
-    else :
+    else:
         print("Unknow config (use --help for help)")
         ret = False
     return ret
@@ -252,7 +250,7 @@ def main():
     else:
         assert False, ("Invalid argument length %s %s" % (func, n_args))
 
-    if func(args) == False:
+    if func(args) is False:
         sys.exit(2)
 
 if __name__ == '__main__':

@@ -35,7 +35,7 @@ from opsvsi.opsvsitest import *
 #OVS_VSCTL = "/usr/bin/ovs-vsctl "
 
 ALL_DAEMONS = "ops-sysd ops-pmd ops-tempd ops-powerd ops-ledd ops-fand"\
-              " ops_cfgd switchd ops-intfd ops-vland ops-lacpd"\
+              " switchd ops-intfd ops-vland ops-lacpd"\
               " ops-lldpd ops-zebra ops-bgpd ovsdb-server"
 
 PLATFORM_DAEMONS = "ops-sysd ops-pmd ops-tempd ops-powerd ops-ledd ops-fand"
@@ -58,6 +58,7 @@ OVSDB_STARTUP_CMD_NO_CONFIGDB = "/usr/sbin/ovsdb-server --remote=punix:/var/"\
 
 OVSDB_STOP_CMD = "kill -9 `cat /var/run/openvswitch/ovsdb-server.pid`"
 CFGD_CMD = "/usr/bin/ops_cfgd"
+CFGD_DAEMON = "cfgd"
 CFG_TBL_NOT_FOUND_MSG = "No rows found in the config table"
 CFG_DATA_FOUND_MSG = "Config data found"
 CUR_CFG_SET_MSG = "cur_cfg already set"
@@ -91,10 +92,19 @@ class cfgdTest(OpsVsiTest):
             build=True)
 
     def stop_daemon(self, switch, daemon):
-        debug(switch.cmd("/bin/systemctl stop " + daemon))
+        out = switch.cmd("/bin/systemctl stop " + daemon)
+        out += switch.cmd("echo")
+        debug(out)
 
     def start_daemon(self, switch, daemon):
-        debug(switch.cmd("/bin/systemctl start " + daemon))
+        out = switch.cmd("/bin/systemctl start " + daemon)
+        out += switch.cmd("echo")
+        debug(out)
+
+    def status_daemon(self, switch, daemon):
+        out = switch.cmd("/bin/systemctl status " + daemon + " -l")
+        out += switch.cmd("echo")
+        return out
 
     def remove_db(self, switch, db):
         debug(switch.cmd("/bin/rm -f " + db))
@@ -105,7 +115,7 @@ class cfgdTest(OpsVsiTest):
     def rebuild_dbs(self, switch):
         debug(self.remove_db(switch, OVSDB))
         debug(self.create_db(switch, CREATE_OVSDB_CMD))
-        debug(self.remove_db(switch, CONFIGDB))
+        #debug(self.remove_db(switch, CONFIGDB))
         debug(self.create_db(switch, CREATE_CONFIGDB_CMD))
 
     def chk_cur_next_cfg(self, switch):
@@ -155,8 +165,13 @@ class cfgdTest(OpsVsiTest):
         self.restart_system(switch, "noconfig")
 
         # start ops_cfgd
-        out = switch.cmd(CFGD_CMD)
+        out = self.start_daemon(switch, CFGD_DAEMON)
         debug(out)
+        sleep(10)
+
+        out = self.status_daemon(switch, CFGD_DAEMON)
+        debug(out)
+
         if CFG_TBL_NOT_FOUND_MSG in out:
             info("\n### Passed: Correct msg received when no configdb ###")
         else:
@@ -164,57 +179,29 @@ class cfgdTest(OpsVsiTest):
                 "Failed: Incorrect response when configdb missing.\n"
 
     def verify_connect_to_db(self):
-        info("\n########## Test to verify connects to configdb ###########")
+        info("\n########## Test to verify connects to configdb and"
+             " detect no startup row ###########")
 
         switch = self.net.switches[0]
+        # Remove config db file and restart system
+        debug(self.remove_db(switch, CONFIGDB))
+
         self.restart_system(switch, "normal")
 
         # start ops_cfgd
-        out = switch.cmd(CFGD_CMD)
+        out = self.start_daemon(switch, CFGD_DAEMON)
+        debug(out)
+        sleep(10)
+
+        out = self.status_daemon(switch, CFGD_DAEMON)
         debug(out)
 
         if CFG_TBL_NOT_FOUND_MSG in out:
             info("\n### Passed: Correct msg received when"
-                 " no rows in config table ####")
+                 " no rows in config table ####\n")
         else:
             assert(CFG_TBL_NOT_FOUND_MSG in out), \
                 "Failed: Incorrect response when no rows in config table.\n"
-
-    def verify_find_startup_row(self):
-        info("\n########## Test to verify ops_cfgd finds startup"
-             " row in configdb ##########")
-        switch = self.net.switches[0]
-        self.restart_system(switch, "normal")
-
-        # Add two rows to configdb, one type==startup, one type==testtype
-        with open(ADD_STARTUP_ROW_FILE) as f_startup:
-            startup_row = f_startup.read()
-        with open(ADD_TEST_ROW_FILE) as f_test:
-            test_row = f_test.read()
-
-        # Note: I have to use the extra "echo" command to flush out
-        #       the buffer, and in some cases, such as the CFGD_CMD,
-        #       I need a sleep.
-        debug(switch.cmd(startup_row))
-        debug(switch.cmd("echo"))
-        debug(switch.cmd(test_row))
-        debug(switch.cmd("echo"))
-
-        # start ops_cfgd
-        out = switch.cmd(CFGD_CMD)
-        #OPS_TODO: Need to replace the sleep with a workable solution
-        #            in the test infrastructure.
-        sleep(5)
-        out += switch.cmd("echo")
-        debug(out)
-
-        if CFG_DATA_FOUND_MSG in out:
-            info("\n### Passed: Correct msg received when "
-                 "startup config in config table. ###")
-        else:
-            assert(CFG_DATA_FOUND_MSG in out), \
-                "Failed: Incorrect response when startup"\
-                " config in config table.\n"
 
     def verify_mark_completion(self):
         info("\n########## Test to verify cur_cfg and "
@@ -225,9 +212,11 @@ class cfgdTest(OpsVsiTest):
         self.restart_system(switch, "normal")
 
         # Run ops_cfgd
-        out = switch.cmd(CFGD_CMD)
-        sleep(5)
-        out += switch.cmd("echo")
+        out = self.start_daemon(switch, CFGD_DAEMON)
+        debug(out)
+        sleep(10)
+
+        out = self.status_daemon(switch, CFGD_DAEMON)
         debug(out)
 
         # Get the contents of the System table
@@ -250,22 +239,33 @@ class cfgdTest(OpsVsiTest):
         switch.cmdCLI("hostname CT-TEST")
         switch.cmdCLI("exit")
         switch.cmdCLI("copy running-config startup-config")
+        sleep(5)
+        output = switch.cmdCLI("show running-config")
+        output += switch.cmdCLI("end")
+        debug(output)
+
+        output = switch.cmdCLI("show startup-config")
+        output += switch.cmdCLI("end")
+        debug(output)
 
         self.restart_system(switch, "normal")
+        sleep(10)
 
         # Run ops_cfgd
-        out = switch.cmd(CFGD_CMD)
-        sleep(5)
-        out += switch.cmd("echo")
+        out = self.start_daemon(switch, CFGD_DAEMON)
+        debug(out)
+        sleep(10)
+
+        out = self.status_daemon(switch, CFGD_DAEMON)
         debug(out)
 
         output = switch.cmdCLI("show running-config")
-        sleep(5)
         output += switch.cmdCLI("end")
+        debug(output)
 
         if "hostname \"CT-TEST\"" in output:
             info("\n### Passed: copy running to startup"
-                 " configuration on bootup ###\n")
+                 " configuration on bootup ###")
         else:
             assert("hostname CT-TEST" in output), \
                 "Failed: copy running to startup configuration on bootup"
@@ -296,17 +296,14 @@ class Test_cfgdTest:
     def __del__(self):
         del self.test
 
+    def test_copy_start_running_on_bootup(self):
+        self.test.copy_start_running_on_bootup()
+
+    def test_verify_mark_completion(self):
+        self.test.verify_mark_completion()
+
     def test_verify_no_configdb_detection(self):
         self.test.verify_no_configdb_detection()
 
     def test_verify_connect_to_db(self):
         self.test.verify_connect_to_db()
-
-    def test_verify_find_startup_row(self):
-        self.test.verify_find_startup_row()
-
-    def test_verify_mark_completion(self):
-        self.test.verify_mark_completion()
-
-    def test_copy_start_running_on_bootup(self):
-        self.test.copy_start_running_on_bootup()
