@@ -82,6 +82,25 @@ class cfgdbUtilTests(OpsVsiTest):
                     "radius-server host 1.1.1.1" in output),\
                 "Failed: To fetch startup configuration"
 
+    def cfgdbutils_show_startup_json_command(self):
+        info('\n########## Test to show startup config in json ##########')
+        s1 = self.net.switches[0]
+        output = s1.cmdCLI("show startup-config json")
+        output += s1.cmdCLI("end")
+        debug(output)
+        output = output[output.index('{'):]
+        output = output[:output.rindex('}') + 1]
+
+        parsed = json.loads(output)
+        system = parsed["System"]
+        radius_servers = system["radius_servers"]
+
+        if "1.1.1.1" in radius_servers:
+            info('\n### Passed: Fetch startup config in json success ###')
+        else:
+            assert ("1.1.1.1" in output), \
+                "Failed: To fetch startup config in json"
+
     def cfgdbutils_copy_running_startup(self):
         info('\n########## Test copy running to startup config ##########')
 
@@ -158,6 +177,9 @@ class Test_cfgdbutil:
     # Show command tests.
     def test_show_config_commands(self):
         self.test.cfgdbutils_show_command()
+
+    def test_show_startup_json(self):
+        self.test.cfgdbutils_show_startup_json_command()
 
     # Delete command tests.
     def test_delete_config_commands(self):
