@@ -16,7 +16,7 @@ Apache 2.0 license. For more details refer to COPYING
 
 ## What other documents are available?
 
-For the high level design of ops-cfgd, refer to [Config persistence design - TBL](DESIGN.md)
-For Command Reference document of ops-cfgd, refer to [Config persistence Command Reference - TBL](CLI.md)
+For the high level design of ops-cfgd, refer to [Config persistence design](/documents/dev/ops-cfgd/design)
+For Command Reference document of ops-cfgd, refer to [Config persistence Command Reference](/documents/user/config_persistence_CLI)
 
 For general information about OpenSwitch project refer to http://www.openswitch.net

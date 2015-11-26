@@ -145,4 +145,4 @@ This command deletes rows with type=**startup** from the configdb.
 
 ## References
 
-For Command Reference document of ops-cfgd, refer to [Config persistence Command Reference - TBL](CLI.md)
+For Command Reference document of ops-cfgd, refer to [Config persistence Command Reference](/documents/user/config_persistence_CLI)
