@@ -142,11 +142,11 @@ class cfgdbUtilTests(OpsVsiTest):
         output = s1.cmdCLI("show running-config")
         output += s1.cmdCLI("end")
 
-        #if "hostname \"CT-TEST\"" in output:
-        #    info('\n### Passed: copy startup to running configuration ###\n')
-        #else:
-        #    assert ("hostname CT-TEST" in output), \
-        #        "Failed: copy startup to running configuration"
+        if "hostname CT-TEST" in output:
+            info('\n### Passed: copy startup to running configuration ###\n')
+        else:
+            assert ("hostname CT-TEST" in output), \
+                "Failed: copy startup to running configuration"
 
 
 class Test_cfgdbutil:
