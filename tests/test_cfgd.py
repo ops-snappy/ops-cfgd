@@ -271,6 +271,7 @@ class cfgdTest(OpsVsiTest):
                 "Failed: copy running to startup configuration on bootup"
 
 
+@pytest.mark.skipif(True, reason="Disabling old tests")
 class Test_cfgdTest:
     def setup(self):
         pass
