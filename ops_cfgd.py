@@ -43,8 +43,8 @@ def_db = 'unix:/var/run/openvswitch/db.sock'
 # Configuration file definitions
 saved_config = None
 # OPS_TODO: Need to pull these three from the build env
-cfgdb_schema = '/usr/share/openvswitch/configdb.ovsschema'
-ovs_schema = '/usr/share/openvswitch/vswitch.ovsschema'
+cfgdb_schema = "%s/configdb.ovsschema" % os.environ.get("OVS_PKGDATADIR", """/usr/share/openvswitch""")
+ovs_schema = "%s/vswitch.ovsschema" % os.environ.get("OVS_PKGDATADIR", """/usr/share/openvswitch""")
 type_startup_config = "startup"
 #3 sec max retry
 max_miliseconds_to_wait_for_config_data = 30
