@@ -13,20 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from runconfig.runconfig import RunConfigUtil
+
+
 from opsrest.settings import settings
-from opsrest.manager import OvsdbConnectionManager
+import ops.dc
 from opslib import restparser
 
+import base64
 import getopt
 import os
 import json
 import sys
-import time
 
 import ovs.dirs
 from ovs.db import error
 from ovs.db import types
+import ovs.poller
 import ovs.db.idl
 import cfgdb
 
@@ -49,29 +51,38 @@ def show_config(args):
 
     if tbl_found:
         try:
-            parsed = json.loads(row.config)
+            data = json.loads(base64.b64decode(row.config))
             print("Startup configuration:")
             if (args[1] == "json"):
-                print json.dumps(parsed,  indent=4, sort_keys=True)
+                print json.dumps(data,  indent=4, sort_keys=True)
             elif (args[1] == "cli"):
                 # Here we copy saved configuration from config DB to temporary
                 # DB and the current startup configuration command displays
                 # output by traversing the temporary DB.
-                manager = OvsdbConnectionManager(TEMPORARY_DB_SHOW_STARTUP,
-                                                 settings.get('ovs_schema'))
-                manager.start()
-                cnt = 30
-                while not manager.idl.run() and cnt > 0:
-                    time.sleep(.1)
-                    cnt -= 1
-                if cnt <= 0:
-                    print("IDL connection timeout")
+                extschema = restparser.parseSchema(settings.get('ext_schema'))
+                ovsschema = settings.get('ovs_schema')
+                ovsremote = TEMPORARY_DB_SHOW_STARTUP
+
+                # initialize idl
+                opsidl = ops.dc.register(extschema, ovsschema, ovsremote)
+                curr_seqno = opsidl.change_seqno
+                while True:
+                    opsidl.run()
+                    if curr_seqno != opsidl.change_seqno:
+                        break
+                    poller = ovs.poller.Poller()
+                    opsidl.wait(poller)
+                    poller.block()
+
+                # write to db
+                txn = ovs.db.idl.Transaction(opsidl)
+                result = ops.dc.write(data, extschema, opsidl, txn)
+                if result == ovs.db.idl.Transaction.INCOMPLETE:
+                    result = txn.commit_block()
+
+                if result not in [ovs.db.idl.Transaction.SUCCESS, ovs.db.idl.Transaction.UNCHANGED]:
+                    print("Transaction result %s" %result)
                     return False
-                # read the schema
-                schema = restparser.parseSchema(settings.get('ext_schema'))
-                run_config_util = RunConfigUtil(manager.idl, schema)
-                run_config_util.write_config_to_db(parsed)
-                manager.idl.close()
 
         except ValueError, e:
             print("Invalid json from configdb. Exception: %s\n" % e)
@@ -85,27 +96,29 @@ def show_config(args):
 
 
 def copy_running_startup():
-    cfg = cfgdb.Cfgdb()
-    manager = OvsdbConnectionManager(settings.get('ovs_remote'),
-                                     settings.get('ovs_schema'))
-    manager.start()
-    idl = manager.idl
 
-    init_seq_no = idl.change_seqno
-    # Wait until the connection is ready
+    # get running config
+    extschema = restparser.parseSchema(settings.get('ext_schema'))
+    ovsschema = settings.get('ovs_schema')
+    ovsremote = settings.get('ovs_remote')
+
+    # initialize idl
+    opsidl = ops.dc.register(extschema, ovsschema, ovsremote)
+    curr_seqno = opsidl.change_seqno
     while True:
-        idl.run()
-        # print self.idl.change_seqno
-        if init_seq_no != idl.change_seqno:
+        opsidl.run()
+        if curr_seqno != opsidl.change_seqno:
             break
-        time.sleep(1)
+        poller = ovs.poller.Poller()
+        opsidl.wait(poller)
+        poller.block()
 
-    restschema = restparser.parseSchema(settings.get('ext_schema'))
+    running_config = ops.dc.read(extschema, opsidl)
 
-    run_config_util = RunConfigUtil(idl, restschema)
-    config = run_config_util.get_running_config()
-
-    cfg.config = ovs.json.to_string(config)
+    # base64 encode to save as startup
+    config = base64.b64encode(json.dumps(running_config))
+    cfg = cfgdb.Cfgdb()
+    cfg.config = config
     cfg.type = "startup"
     row, tbl_found = cfg.find_row_by_type("startup")
     if tbl_found:
@@ -125,7 +138,7 @@ def copy_startup_running():
 
     if tbl_found:
         try:
-            data = json.loads(row.config)
+            data = json.loads(base64.b64decode(row.config))
         except ValueError, e:
             print("Invalid json from configdb. Exception: %s\n" % e)
             cfg.close()
@@ -135,22 +148,29 @@ def copy_startup_running():
         cfg.close()
         return False
 
-    # set up IDL
-    manager = OvsdbConnectionManager(settings.get('ovs_remote'),
-                                     settings.get('ovs_schema'))
-    manager.start()
-    init_seq_no = manager.idl.change_seqno
-    while True:
-        manager.idl.run()
-        if init_seq_no != manager.idl.change_seqno:
-            break
-        time.sleep(1)
+    extschema = restparser.parseSchema(settings.get('ext_schema'))
+    ovsschema = settings.get('ovs_schema')
+    ovsremote = settings.get('ovs_remote')
 
-    # read the schema
-    schema = restparser.parseSchema(settings.get('ext_schema'))
-    run_config_util = RunConfigUtil(manager.idl, schema)
-    run_config_util.write_config_to_db(data)
-    cfg.close()
+    # initialize idl
+    opsidl = ops.dc.register(extschema, ovsschema, ovsremote)
+    curr_seqno = opsidl.change_seqno
+    while True:
+        opsidl.run()
+        if curr_seqno != opsidl.change_seqno:
+            break
+        poller = ovs.poller.Poller()
+        opsidl.wait(poller)
+        poller.block()
+
+    txn = ovs.db.idl.Transaction(opsidl)
+    result = ops.dc.write(data, extschema, opsidl, txn)
+    if result == ovs.db.idl.Transaction.INCOMPLETE:
+        result = txn.commit_block()
+
+    if result not in [ovs.db.idl.Transaction.SUCCESS, ovs.db.idl.Transaction.UNCHANGED]:
+        return False
+
     return True
 
 

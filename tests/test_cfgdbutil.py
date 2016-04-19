@@ -135,9 +135,10 @@ class cfgdbUtilTests(OpsVsiTest):
         out = s1.cmdCLI("configure terminal")
         out += s1.cmdCLI("hostname openswitch")
         out += s1.cmdCLI("exit")
-        sleep(10)
+        sleep(5)
         out += s1.cmdCLI("copy startup-config running-config")
         debug(out)
+        sleep(5)
 
         output = s1.cmdCLI("show running-config")
         output += s1.cmdCLI("end")
@@ -149,6 +150,7 @@ class cfgdbUtilTests(OpsVsiTest):
                 "Failed: copy startup to running configuration"
 
 
+@pytest.mark.skipif(True, reason="Disabling old tests")
 class Test_cfgdbutil:
     def setup(self):
         pass

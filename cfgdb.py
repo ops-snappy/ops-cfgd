@@ -14,13 +14,13 @@
 
 import os
 import sys
-from time import sleep
 
 import ovs.dirs
 from ovs.db import error
 from ovs.db import types
 import ovs.db.idl
 import ovs.vlog
+import ovs.poller
 
 vlog = ovs.vlog.Vlog("cfgdb")
 
@@ -31,8 +31,6 @@ def_db = 'unix:/var/run/openvswitch/db.sock'
 
 # OPS_TODO: Need to pull this from the build env
 cfgdb_schema = '/usr/share/openvswitch/configdb.ovsschema'
-
-max_time_to_wait_for_config_data = 30
 
 #Configdb tabe names
 CONFIG_TABLE = "config"
@@ -71,13 +69,14 @@ class Cfgdb(object):
         self.date = None
         self.hardware = None
 
-        '''
-        The wait time is 30 * 0.1 = 3 seconds
-        '''
-        cnt = max_time_to_wait_for_config_data
-        while not self.idl.run() and cnt > 0:
-            cnt -= 1
-            sleep(.1)
+        curr_seqno = self.idl.change_seqno
+        while True:
+            self.idl.run()
+            if curr_seqno != self.idl.change_seqno:
+                break
+            poller = ovs.poller.Poller()
+            self.idl.wait(poller)
+            poller.block()
 
     def find_row_by_type(self, cfgtype):
         '''
